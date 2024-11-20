@@ -6,8 +6,8 @@ import time
 SHOP_URL = "changeme-1234.myshopify.com"
 ACCESS_TOKEN = "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"  # Używamy Admin API Access Token
 
-# Ustawienie sesji
-session = shopify.Session(f"https://{SHOP_URL}/admin/api/2024-01", ACCESS_TOKEN)
+# Poprawna konfiguracja sesji
+session = shopify.Session(f"https://{SHOP_URL}", "2024-01", ACCESS_TOKEN)
 shopify.ShopifyResource.activate_session(session)
 
 # 2. Funkcja do pobierania jednej strony produktów
