@@ -4,7 +4,7 @@ import time
 
 # 1. Konfiguracja API
 SHOP_URL = "changeme-1234.myshopify.com"
-API_KEY = "fec520ef4d8480c0dd458028fe9c920f"
+API_KEY = ""
 PASSWORD = "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"
 
 shopify.Session.setup(api_key=API_KEY, secret=PASSWORD)
