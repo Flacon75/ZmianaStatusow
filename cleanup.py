@@ -4,16 +4,19 @@ import time
 
 # 1. Konfiguracja API
 SHOP_URL = "changeme-1234.myshopify.com"
-API_KEY = "fec520ef4d8480c0dd458028fe9c920f"
-PASSWORD = "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"
+ACCESS_TOKEN = "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"  # Używamy Admin API Access Token
 
-shopify.Session.setup(api_key=API_KEY, secret=PASSWORD)
-session = shopify.Session(f"https://{SHOP_URL}", "2024-01")
+# Ustawienie sesji
+session = shopify.Session(f"https://{SHOP_URL}/admin/api/2024-01", ACCESS_TOKEN)
 shopify.ShopifyResource.activate_session(session)
 
 # 2. Funkcja do pobierania jednej strony produktów
 def fetch_products_page(page):
-    return shopify.Product.find(limit=250, page=page)
+    try:
+        return shopify.Product.find(limit=250, page=page)
+    except Exception as e:
+        print(f"Błąd pobierania strony {page}: {e}")
+        return []
 
 # 3. Funkcja do przetwarzania produktów
 def process_products(products):
@@ -25,24 +28,24 @@ def process_products(products):
 
         # Zastosuj reguły
         if total_quantity <= 0 and current_status == "draft":
-            # NIC NIE ROBIĆ
-            continue
+            continue  # NIC NIE ROBIĆ
         elif total_quantity <= 0 and current_status == "active":
             product.status = "draft"
         elif total_quantity > 0 and current_status == "draft":
             product.status = "active"
         elif total_quantity > 0 and current_status == "active":
-            # NIC NIE ROBIĆ
-            continue
+            continue  # NIC NIE ROBIĆ
 
         # Zapisz zmiany
-        product.save()
+        try:
+            product.save()
+        except Exception as e:
+            print(f"Błąd zapisu produktu {product.id}: {e}")
 
 # 4. Główna funkcja obsługująca paginację i równoległe pobieranie
 def update_all_products():
     page = 1
-    products_collected = []
-    
+
     with ThreadPoolExecutor(max_workers=10) as executor:
         while True:
             # Uruchamiamy równoległe pobieranie stron
