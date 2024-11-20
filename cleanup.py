@@ -10,8 +10,8 @@ logging.basicConfig(
 )
 
 # Konfiguracja API
-SHOP_URL = "changeme-1234.myshopify.com"
-ACCESS_TOKEN = "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"
+SHOP_URL = "twoj-sklep.myshopify.com"
+ACCESS_TOKEN = "twój token"
 API_VERSION = "2024-10"
 
 # Rozpoczęcie sesji Shopify
