@@ -1,79 +1,61 @@
-import requests
+import shopify
+import time
 
-# Dane autoryzacyjne
-SHOP_URL = "https://changeme-1234.myshopify.com"  # <- Zmień na swój URL sklepu
+# Konfiguracja API
+SHOP_URL = "nazwa-sklepu.myshopify.com"
+ACCESS_TOKEN = "wpisz token"
 API_VERSION = "2024-10"
-ACCESS_TOKEN = "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"
 
-# Endpoint i nagłówki
-base_url = f"{SHOP_URL}/admin/api/{API_VERSION}/products.json"
-headers = {
-    "X-Shopify-Access-Token": ACCESS_TOKEN
-}
+# Rozpoczęcie sesji Shopify
+session = shopify.Session(f"https://{SHOP_URL}", API_VERSION, ACCESS_TOKEN)
+shopify.ShopifyResource.activate_session(session)
 
-# Funkcja pobierająca produkty z paginacją
-def fetch_all_products():
-    page = 1
-    products = []
+# Funkcja przetwarzania produktów
+def process_products(products):
+    for product in products:
+        total_quantity = sum(
+            [variant.inventory_quantity for variant in product.variants]
+        )
+        current_status = product.status
+
+        # Zastosowanie reguły Maćka
+        if total_quantity <= 0 and current_status == "draft":
+            continue
+        elif total_quantity <= 0 and current_status == "active":
+            product.status = "draft"
+        elif total_quantity > 0 and current_status == "draft":
+            product.status = "active"
+        elif total_quantity > 0 and current_status == "active":
+            continue
+
+        # Zapisanie zmian
+        product.save()
+
+# Funkcja obsługi paginacji za pomocą since_id
+def update_all_products():
+    since_id = 0  # since_id zaczynamy od zera
     while True:
-        params = {"limit": 250, "page": page}
-        response = requests.get(base_url, headers=headers, params=params)
+        try:
+            # Pobranie produktów z API Shopify
+            products = shopify.Product.find(limit=250, since_id=since_id)
+            if not products:
+                break
 
-        if response.status_code != 200:
-            print(f"Błąd pobierania produktów (strona {page}): {response.status_code}")
-            print(response.text)
+            # Przetwarzanie produktów
+            process_products(products)
+
+            # Aktualizacja since_id
+            since_id = products[-1].id  # Ustawienie ID ostatniego produktu jako nowy since_id
+        except Exception as e:
+            print(f"Błąd pobierania strony: {e}")
             break
 
-        page_products = response.json().get("products", [])
-        if not page_products:
-            break  # Koniec danych
+# Wykonanie głównej funkcji
+start_time = time.time()
+update_all_products()
+end_time = time.time()
 
-        products.extend(page_products)
-        page += 1
+print(f"Proces zakończony w {end_time - start_time:.2f} sekund.")
 
-    return products
-
-# Funkcja aktualizująca status produktu
-def update_product_status(product_id, new_status):
-    url = f"{SHOP_URL}/admin/api/{API_VERSION}/products/{product_id}.json"
-    data = {
-        "product": {
-            "id": product_id,
-            "status": new_status
-        }
-    }
-
-    response = requests.put(url, headers=headers, json=data)
-    if response.status_code == 200:
-        print(f"Zaktualizowano produkt {product_id} na status '{new_status}'")
-    else:
-        print(f"Błąd aktualizacji produktu {product_id}: {response.status_code}")
-        print(response.text)
-
-# Główna funkcja przetwarzająca produkty
-def process_products():
-    products = fetch_all_products()
-    if not products:
-        print("Brak produktów do przetworzenia.")
-        return
-
-    for product in products:
-        # Oblicz całkowitą ilość dla produktu
-        total_quantity = sum(int(variant["inventory_quantity"]) for variant in product["variants"])
-        current_status = product.get("status")
-
-        # Reguły przetwarzania
-        if total_quantity <= 0 and current_status == "draft":
-            print(f"Produkt {product['id']} już w statusie 'draft'. NIC NIE ROBIĆ.")
-        elif total_quantity <= 0 and current_status == "active":
-            print(f"Produkt {product['id']} w statusie 'active'. Zmiana na 'draft'.")
-            update_product_status(product["id"], "draft")
-        elif total_quantity > 0 and current_status == "draft":
-            print(f"Produkt {product['id']} w statusie 'draft'. Zmiana na 'active'.")
-            update_product_status(product["id"], "active")
-        elif total_quantity > 0 and current_status == "active":
-            print(f"Produkt {product['id']} już w statusie 'active'. NIC NIE ROBIĆ.")
-
-# Uruchomienie
-if __name__ == "__main__":
-    process_products()
+# Zakończenie sesji Shopify uwaga trochę potrwa
+shopify.ShopifyResource.clear_session()
